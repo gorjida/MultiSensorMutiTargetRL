@@ -179,11 +179,17 @@ if __name__=="__main__":
                 measure = measurement(bearing_var)  # create measurement object
                 #Create list of sensor objects
                 s = []
+                #Initialization for the fusion centre (number of targets is know a priori)
+                init_for_fusion = []
+                for target_counter in range(0,num_targets):init_for_fusion.append([x[target_counter] + np.random.normal(0, 5), y[target_counter] + np.random.normal(0, 5),np.random.normal(0, .1),np.random.normal(0, .1)])
+
                 for sensor_index in range(0, num_sensors):
                     init_for_sensor = []
                     for target_counter in range(0, num_targets):
                         init_for_sensor.append([x[target_counter] + np.random.normal(0, 5), y[target_counter]+ np.random.normal(0, 5), np.random.normal(0, .1),
                                              np.random.normal(0, .1)])
+
+
 
                     temp_sensor_object = sensor("POLICY_COMM_LINEAR",x_sensor[sensor_index],y_sensor[sensor_index])
                     # Create tracker object for each target
