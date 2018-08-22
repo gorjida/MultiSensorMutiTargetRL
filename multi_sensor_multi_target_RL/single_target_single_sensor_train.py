@@ -33,7 +33,7 @@ def gen_learning_rate(iteration, l_max, l_min, N_max):
 # Set general parameters
 MAX_UNCERTAINTY = 1E9
 num_states = 6
-sigma_max = 1
+sigma_max = 2
 num_episodes = []
 gamma = .99
 episode_length = 1500
@@ -47,7 +47,7 @@ base_path = "/dev/resoures/DeepSensorManagement-original/"
 
 #def run(args):
 if __name__=="__main__":
-    v_max = 15
+    v_max = 20
     coeff = .9
     vel_var = .001
 
@@ -65,13 +65,15 @@ if __name__=="__main__":
     # Random initialization of policy weights
     params = {0: {}, 1: {}, 2: {}}
     params[0]["weight"] = np.random.normal(0, .3, [2, num_states])
-    params[0]["weight"] = np.array([[ 1.45702249, -1.17664153, -0.11593174,  1.02967173, -0.25321044,0.09052774],
-    [ 0.67730786,  0.3213561 ,  0.99580938, -2.39007038, -1.16340594,
-    -1.77515938]])
+    #params[0]["weight"] = np.array([[ 1.45702249, -1.17664153, -0.11593174,  1.02967173, -0.25321044,0.09052774],
+    #[ 0.67730786,  0.3213561 ,  0.99580938, -2.39007038, -1.16340594,
+    #-1.77515938]])
     #params[0]["weight"] = np.array([[7.8298383, 10.37983478, 3.35204969, 9.91446941,
      #                   -2.84844313, -13.96745699],
       #                [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
        #                 12.16543779, -4.48418833]])
+
+    #params[0]["weight"] = np.array([[16.64818847,-16.49593929,4.8279328,-8.46072754,6.21521522,19.07721404],[16.26959534,17.45324923,12.6411358 ,1.22907483,-15.13352868,7.78952872]])
 
     return_saver = []
     error_saver = []
@@ -136,10 +138,10 @@ if __name__=="__main__":
         scen = scenario(1, 1)
         bearing_var = 1E-2  # variance of bearing measurement
         # Randomly initialize target location
-        x = (scen.x_max-scen.x_min)/2.0 * random.random() + scen.x_min/2.0  # initial x-location
-        y = (scen.y_max-scen.y_min)/2.0 * random.random() + scen.y_min/2.0  # initial y-location
-        xdot = (scen.vel_max-scen.vel_min) * random.random() + scen.vel_min  # initial xdot-value
-        ydot = (scen.vel_max-scen.vel_min) * random.random() + scen.vel_min  # initial ydot-value
+        x = 20000 * random.random() -10000  # initial x-location
+        y = 20000 * random.random() -10000  # initial y-location
+        xdot = 20 * random.random() -10  # initial xdot-value
+        ydot = 20 * random.random() -10  # initial ydot-value
         t = [target([x,y], xdot,ydot, vel_var, vel_var,"CONS_V")]
         init_sensor_state = [10000 * random.random() - 5000, 10000 * random.random() - 5000, 3, -2]
         init_target_state = [x, y, xdot, ydot]  # initialize target state
@@ -219,22 +221,23 @@ if __name__=="__main__":
 
             if np.max(np.abs(gradiant)) > 1E2: continue  # clip large gradients
             adjustment_term = gradiant * normalized_discounted_return[e]  # an unbiased sample of return
-            #params[0]['weight'] += rate * adjustment_term
+            params[0]['weight'] += rate * adjustment_term
 
         return_saver.append(sum(s.reward))
         error_saver.append(np.mean(metric_obj.pos_error[0][0]))
         episode_counter+=1
 
         # print(len(return_saver),n)
-        if episode_counter % 50 == 0 and episode_counter > 0:
+        if episode_counter % 100 == 0 and episode_counter > 0:
+            #print(episode_counter, np.mean(return_saver), sigma)
             # if episode_counter%100==0 and episode_counter>0:
             avg_reward.append(np.mean(sorted(return_saver)[0:int(.95 * len(return_saver))]))
             avg_error.append(np.mean(sorted(error_saver)[0:int(.95 * len(error_saver))]))
             var_reward.append(np.var(return_saver))
             return_saver = []
             error_saver = []
-            print(episode_counter, avg_reward, sigma)
-            sys.exit(1)
+            print(avg_reward)
+
 
 """
 if __name__ == "__main__":
