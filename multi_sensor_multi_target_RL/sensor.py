@@ -70,6 +70,7 @@ class sensor(motion_model,motion_init_object):
         self.uncertainty = []
         self.tracker_object = None
 
+
     def set_tracker_objects(self,tracker_objects):
         self.tracker_object = tracker_objects
         for i in range(0,len(self.tracker_object.tracks)): self.uncertainty.append([])
@@ -77,11 +78,14 @@ class sensor(motion_model,motion_init_object):
     def update_track_estimaes(self):self.tracker_object.update_target_states(self.current_location, self.m[-1]) #Update the target estimates
 
 
-    def move_sensor(self,scen,params,v_max, coeff, alpha1, alpha2, alpha1_, alpha2_):
+    def move_sensor(self,scen,params,v_max, coeff, alpha1, alpha2, alpha1_, alpha2_,sigma):
 
         track_local_actions = []
-        for i in range(0, len(self.tracker_object.tracks)):
-            current_state = list(self.tracker_object.tracks[i].x_k_k.reshape(len(self.tracker_object.tracks[i].x_k_k))) + list(self.current_location)
+        num_tracks = len(self.tracker_object.tracks)
+        input_states = []
+        for i in range(0, num_tracks):
+            current_state = list(self.tracker_object.tracks[i].x_k_k.reshape(len(self.tracker_object.tracks[i].x_k_k))) + \
+                            list(self.current_location)
 
             x_slope = 2.0 / (scen.x_max - scen.x_min)
             y_slope = 2.0 / (scen.y_max - scen.y_min)
@@ -94,13 +98,22 @@ class sensor(motion_model,motion_init_object):
             current_state[4] = -1 + x_slope * (current_state[4] - scen.x_min)
             current_state[5] = -1 + y_slope * (current_state[5] - scen.y_min)
             input_state = current_state
+            input_states.append(input_state)
             #input_state_temp.append(input_state)  # store input-sates
-            track_local_actions.append(self.generate_action(params, input_state, .01))
+            if num_tracks==1:
+
+                self.update_location_new_limit(params, input_state, sigma, v_max, coeff, alpha1, alpha2, alpha1_,
+                                               alpha2_)
+            else:
+                track_local_actions.append(self.generate_action(params, input_state, sigma))
 
         #Update the location of the sensor
-        normalized_state, index_matrix1, index_matrix2, slope = \
-            self.update_location_decentralized_limit(track_local_actions, 1, params,
-                                                  v_max, coeff, alpha1, alpha2, alpha1_, alpha2_, 0)
+        if num_tracks>1:
+            normalized_state, index_matrix1, index_matrix2, slope = \
+                self.update_location_decentralized_limit(track_local_actions, 1, params,
+                                                    v_max, coeff, alpha1, alpha2, alpha1_, alpha2_, 0)
+
+        return (input_states)
 
 
     def gen_sensor_reward(self,MAX_UNCERTAINTY,window_size,window_lag):
@@ -116,8 +129,10 @@ class sensor(motion_model,motion_init_object):
             unormalized_uncertainty = np.sum(self.tracker_object.tracks[i].p_k_k.diagonal())
             self.uncertainty[i].append((1.0 / MAX_UNCERTAINTY) * unormalized_uncertainty)
 
+
         this_uncertainty = []
         [this_uncertainty.append(self.uncertainty[x][-1]) for x in range(0, len(self.tracker_object.tracks))]
+
         self.avg_uncertainty.append(np.mean(this_uncertainty))
 
         if len(self.avg_uncertainty) < window_size + window_lag:
@@ -130,6 +145,7 @@ class sensor(motion_model,motion_init_object):
                 self.reward.append(1)
             else:
                 self.reward.append(0)
+
 
     def gen_measurements(self,t,measure,pd,landa):
         """
