@@ -6,6 +6,7 @@ import numpy as np
 import random
 import sys
 from scenario import scenario
+from FUSION_Agent import centralized_fusion
 from scipy.stats import norm
 #import matplotlib.pyplot as plt
 
@@ -185,9 +186,11 @@ if __name__=="__main__":
 
                 for sensor_index in range(0, num_sensors):
                     init_for_sensor = []
+                    init_cov_for_sensor = []
                     for target_counter in range(0, num_targets):
                         init_for_sensor.append([x[target_counter] + np.random.normal(0, 5), y[target_counter]+ np.random.normal(0, 5), np.random.normal(0, .1),
                                              np.random.normal(0, .1)])
+                        init_cov_for_sensor.append(np.array(init_covariance))
 
 
 
@@ -198,6 +201,19 @@ if __name__=="__main__":
                     jpdaf_object = JPDAF_agent(tracker_object, .004, pd, 1E-5)
                     temp_sensor_object.set_tracker_objects(jpdaf_object)
                     s.append(temp_sensor_object)
+
+                #Form fusion agent
+                #################
+                init_for_sensor = []
+                init_cov_for_sensor = []
+                for target_counter in range(0, num_targets):
+                    init_for_sensor.append(
+                        [x[target_counter] + np.random.normal(0, 5), y[target_counter] + np.random.normal(0, 5),
+                         np.random.normal(0, .1),
+                         np.random.normal(0, .1)])
+                    init_cov_for_sensor.append(np.array(init_covariance))
+                fusion_agent = centralized_fusion(len(s),init_for_sensor,init_cov_for_sensor)
+                ##################
 
                 episode_condition = True
                 metric_obj = metric(num_targets,num_sensors)
@@ -217,12 +233,13 @@ if __name__=="__main__":
                         #FUSION comes here
 
                         #Move the sensor
-                        s[sensor_index].move_sensor(scen, params, v_max, coeff, alpha1, alpha2, alpha1_, alpha2_)
+                        s[sensor_index].move_sensor(scen, params, v_max, coeff, alpha1, alpha2, alpha1_, alpha2_,.01)
                         #Generate reward
                         s[sensor_index].gen_sensor_reward(MAX_UNCERTAINTY, window_size, window_lag)
                     #Calculate metrics
                     #sys.exit(1)
                     metric_obj.update_truth_estimate_metrics(t,s)
+                    sys.exit(1)
                     #check for genral metrics and stopping conditions
                     n+=1
                     if n > episode_length: episode_condition = False

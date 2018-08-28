@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.stats import norm
 
-"""
+
 class EKF_tracker:
     def __init__(self,init_estimate,init_covariance,A,B,x_var,y_var,bearing_var):
 
@@ -73,8 +73,9 @@ class EKF_tracker:
         self.x_k_k = self.x_k_km1 + kalman_gain*self.innovation_list[-1]
         self.p_k_k = self.p_k_km1 - (kalman_gain.dot(measurement_vector)).dot(self.p_k_km1)
         self.gain.append(kalman_gain)
-"""
 
+
+"""
 class EKF_tracker:
     def __init__(self,init_estimate,init_covariance,A,B,x_var,y_var,bearing_var):
 
@@ -141,3 +142,4 @@ class EKF_tracker:
         self.x_k_k = self.x_k_km1 + kalman_gain*self.innovation_list[-1]
         self.p_k_k = self.p_k_km1 - (kalman_gain.dot(measurement_vector)).dot(self.p_k_km1)
         self.gain.append(kalman_gain)
+"""
