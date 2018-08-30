@@ -147,7 +147,8 @@ if __name__=="__main__":
         init_target_state = [x, y, xdot, ydot]  # initialize target state
         init_covariance = np.diag([MAX_UNCERTAINTY, MAX_UNCERTAINTY, MAX_UNCERTAINTY,
                                    MAX_UNCERTAINTY])  # initial covariance of state estimation
-        temp_sensor_object = sensor("POLICY_COMM_LINEAR",init_sensor_state[0], init_sensor_state[1])
+        temp_sensor_object = sensor("POLICY_COMM_LINEAR",init_sensor_state[0]
+                                    , init_sensor_state[1],np.array(params[0]["weight"]))
 
         init_for_tracker = [x + np.random.normal(0, 5), y + np.random.normal(0, 5), np.random.normal(0, 5),
                         np.random.normal(0, 5)]
@@ -156,7 +157,6 @@ if __name__=="__main__":
         y_var = t[0].y_var
         tracker_object = EKF_tracker(init_for_tracker, init_covariance, A, B, x_var, y_var,bearing_var)
         clean_agent = clean_tracker_agent([tracker_object])
-
         temp_sensor_object.set_tracker_objects(clean_agent)
 
         s = temp_sensor_object

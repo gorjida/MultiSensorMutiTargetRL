@@ -71,6 +71,7 @@ class sensor(motion_model,motion_init_object):
         self.tracker_object = None
 
 
+
     def set_tracker_objects(self,tracker_objects):
         self.tracker_object = tracker_objects
         for i in range(0,len(self.tracker_object.tracks)): self.uncertainty.append([])
@@ -339,7 +340,8 @@ class sensor(motion_model,motion_init_object):
 
     def update_location_new_limit_v2(self,params,state,sigma,v_max,coeff,alpha1,alpha2,alpha1_,alpha2_,weight_index=0):
         if self.motion_type==self.policy_command_type_linear:
-            weight = params[weight_index]['weight']
+            #weight = params[weight_index]['weight']
+            weight = params
             Delta = np.random.normal((2.0*v_max/np.pi)*np.arctan(weight.dot(state)), sigma)
             Delta[0],grad = get_limit(v_max,coeff,alpha1,alpha2,alpha1_,alpha2_,Delta[0])
             Delta[1],grad = get_limit(v_max, coeff, alpha1, alpha2, alpha1_, alpha2_, Delta[1])
@@ -353,7 +355,8 @@ class sensor(motion_model,motion_init_object):
 
     def update_location_new_limit(self,params,state,sigma,v_max,coeff,alpha1,alpha2,alpha1_,alpha2_,weight_index=0):
         if self.motion_type==self.policy_command_type_linear:
-            weight = params[weight_index]['weight']
+            #weight = params[weight_index]['weight']
+            weight = params
             Delta = weight.dot(state)
             Delta[0],grad = get_limit(v_max,coeff,alpha1,alpha2,alpha1_,alpha2_,Delta[0])
             Delta[1],grad = get_limit(v_max, coeff, alpha1, alpha2, alpha1_, alpha2_, Delta[1])
