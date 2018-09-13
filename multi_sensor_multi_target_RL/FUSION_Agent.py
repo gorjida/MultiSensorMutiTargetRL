@@ -2,18 +2,15 @@
 import numpy as np
 class centralized_fusion:
     def __init__(self,window_size , window_lag, MAX_UNCERTAINTY,num_sensors,initial_x_k_k,initial_p_k_k):
+        self.initial_fusion_uncertainty = 1E18
         self.num_targets = len(initial_x_k_k)
         self.window_size = window_size
         self.window_lag = window_lag
         self.MAX_UNCERTAINTY = MAX_UNCERTAINTY
 
         self.num_sensors = num_sensors
-        self.global_x_k_k = initial_x_k_k
-        self.global_p_k_k = initial_p_k_k
-        self.cumulative_x_k_k = []
-        for t in range(0,len(self.global_x_k_k)):
-            temp = np.linalg.inv(self.global_p_k_k[t]).dot(self.global_x_k_k[t]).reshape([4,1])
-            self.cumulative_x_k_k.append(temp)
+        self.global_x_k_k = list(initial_x_k_k)
+        self.global_p_k_k = list(initial_p_k_k)
 
         self.sensors_target_uncertainty = []
         self.sensors_avg_uncertainty = []
@@ -34,7 +31,17 @@ class centralized_fusion:
             local_to_global_map[n] = n
         return (local_to_global_map)
 
-    def update_global(self,sensors):
+    def update_global(self,sensors,memory=True):
+
+        self.cumulative_x_k_k = []
+        for t in range(0, len(self.global_x_k_k)):
+            temp = np.linalg.inv(self.global_p_k_k[t]).dot(self.global_x_k_k[t]).reshape([4, 1])
+            self.cumulative_x_k_k.append(temp)
+
+        if not memory:
+            for target_index in range(0,self.num_targets):
+                self.global_p_k_k[target_index] = np.diag([self.initial_fusion_uncertainty,self.initial_fusion_uncertainty,
+                                         self.initial_fusion_uncertainty,self.initial_fusion_uncertainty])
         #Sequential update over all the sensors
         for sensor_index in range(0,self.num_sensors):
             current_sensor_object = sensors[sensor_index]
@@ -81,6 +88,69 @@ class centralized_fusion:
                     self.reward[sensor_index].append(1)
                 else:
                     self.reward[sensor_index].append(0)
+
+    def update_global_memoryless(self,sensors):
+
+        cum_cov = {}
+        cum_mean = {}
+        for t in range(0, len(self.global_x_k_k)):
+            #temp = np.linalg.inv(self.global_p_k_k[t]).dot(self.global_x_k_k[t]).reshape([4, 1])
+
+            cum_cov[t] = []
+            cum_mean[t] = []
+
+        for sensor_index in range(0, self.num_sensors):
+            current_sensor_object = sensors[sensor_index]
+            local_tracks = current_sensor_object.tracker_object.tracks
+            local_x_k_k_s = []
+            local_p_k_k_s = []
+            for track in local_tracks:
+                local_x_k_k_s.append(track.x_k_k)
+                local_p_k_k_s.append(track.p_k_k)
+            local_to_global_map = self.form_2d_assignment(local_x_k_k_s, local_p_k_k_s)
+            for target_index in range(0, self.num_targets):
+                local_x_k_k = local_x_k_k_s[target_index]
+                local_p_k_k = local_p_k_k_s[target_index]
+
+
+                if not cum_cov[target_index]:
+                    cum_cov[target_index].append(np.linalg.inv(local_p_k_k))
+                    cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k))
+                else:
+                    cum_cov[target_index].append(np.linalg.inv(local_p_k_k)+cum_cov[target_index][-1])
+                    cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k)+cum_mean[target_index][-1])
+
+        for t in range(0, len(self.global_x_k_k)):
+            self.global_p_k_k[t] = np.linalg.inv(cum_cov[t][-1])
+            self.global_x_k_k[t] = self.global_p_k_k[t].dot(cum_mean[t][-1])
+
+
+
+    def update_global_sequential(self,sensors):
+        for sensor_index in range(0, self.num_sensors):
+            current_sensor_object = sensors[sensor_index]
+            local_tracks = current_sensor_object.tracker_object.tracks
+            local_x_k_k_s = []
+            local_p_k_k_s = []
+            for track in local_tracks:
+                local_x_k_k_s.append(track.x_k_k)
+                local_p_k_k_s.append(track.p_k_k)
+
+            local_to_global_map = self.form_2d_assignment(local_x_k_k_s, local_p_k_k_s)
+            for target_index in range(0, self.num_targets):
+                #New measurement and associated covariance
+                local_x_k_k = local_x_k_k_s[target_index]
+                local_p_k_k = local_p_k_k_s[target_index]
+                #Form innovation covariances
+                S = self.global_p_k_k[target_index]+local_p_k_k
+                #Form kalman gain
+                Gain = self.global_p_k_k[target_index].dot(np.linalg.inv(self.global_p_k_k[target_index]+local_p_k_k))
+                #Form error-term
+                estimate_error = local_x_k_k-self.global_x_k_k[target_index]
+                print(Gain)
+                #Update rules
+                self.global_x_k_k[target_index] += Gain.dot(estimate_error)
+                self.global_p_k_k[target_index] = self.global_p_k_k[target_index]-Gain.dot(self.global_p_k_k[target_index])
 
             
 

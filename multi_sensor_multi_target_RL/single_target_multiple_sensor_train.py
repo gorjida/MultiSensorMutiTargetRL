@@ -48,7 +48,7 @@ base_path = "/dev/resoures/DeepSensorManagement-original/"
 
 #def run(args):
 if __name__=="__main__":
-    num_sensors = 2
+    num_sensors = 3
     v_max = 20
     coeff = .9
     vel_var = .001
@@ -65,8 +65,13 @@ if __name__=="__main__":
     #print("Starting Thread:" + str(process_index))
 
     # Random initialization of policy weights
+    pre_trained_weights =  np.array([[7.8298383, 10.37983478, 3.35204969, 9.91446941,
+                        -2.84844313, -13.96745699],
+                      [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
+                        12.16543779, -4.48418833]])
     sensor_params = []
-    for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
+    #for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
+    for sensor_index in range(0,num_sensors): sensor_params.append(pre_trained_weights)
 
     #params[0]["weight"] = np.array([[ 1.45702249, -1.17664153, -0.11593174,  1.02967173, -0.25321044,0.09052774],
     #[ 0.67730786,  0.3213561 ,  0.99580938, -2.39007038, -1.16340594,
@@ -75,8 +80,6 @@ if __name__=="__main__":
      #                   -2.84844313, -13.96745699],
       #                [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
        #                 12.16543779, -4.48418833]])
-
-    #params[0]["weight"] = np.array([[16.64818847,-16.49593929,4.8279328,-8.46072754,6.21521522,19.07721404],[16.26959534,17.45324923,12.6411358 ,1.22907483,-15.13352868,7.78952872]])
 
     return_saver = []
     error_saver = []
@@ -153,6 +156,12 @@ if __name__=="__main__":
         s = []
         init_target_estimate_for_fusion = []
         init_target_cov_for_fusion = []
+        init_target_estimate_for_fusion.append(
+            np.array([x + np.random.normal(0, 5), y + np.random.normal(0, 5), np.random.normal(0, 5),
+             np.random.normal(0, 5)]).reshape(4,1))
+        MAX_UNCERTAINTY_FUSION = 1E12
+        init_target_cov_for_fusion.append(np.diag([MAX_UNCERTAINTY_FUSION, MAX_UNCERTAINTY_FUSION, MAX_UNCERTAINTY_FUSION,
+                                   MAX_UNCERTAINTY_FUSION]))
         for sensor_index in range(0,num_sensors):
             init_sensor_state = [10000 * random.random() - 5000, 10000 * random.random() - 5000, 3, -2]
             temp_sensor_object = sensor("POLICY_COMM_LINEAR",init_sensor_state[0]
@@ -160,9 +169,6 @@ if __name__=="__main__":
 
             init_for_tracker = [x + np.random.normal(0, 5), y + np.random.normal(0, 5), np.random.normal(0, 5),
                             np.random.normal(0, 5)]
-            init_target_estimate_for_fusion.append([x + np.random.normal(0, 5), y + np.random.normal(0, 5), np.random.normal(0, 5),
-                            np.random.normal(0, 5)])
-            init_target_cov_for_fusion.append(init_covariance)
 
             A, B = t[0].constant_velocity(1E-10)  # Get motion model
             x_var = t[0].x_var
@@ -173,13 +179,13 @@ if __name__=="__main__":
             s.append(temp_sensor_object)
 
         #Finally, initialize fusion object
-        fusion_agent = centralized_fusion(window_size , window_lag, MAX_UNCERTAINTY,
-                                          num_sensors,init_target_estimate_for_fusion,init_target_cov_for_fusion)
+        fusion_agent = centralized_fusion(window_size , window_lag, MAX_UNCERTAINTY,num_sensors,init_target_estimate_for_fusion,init_target_cov_for_fusion)
+
         #measure = measurement(bearing_var)
 
         episode_condition = True
         n=0
-        metric_obj = metric(1,1)
+        metric_obj = metric(1,num_sensors)
         episode_state = []
         for sensor_index in range(0,num_sensors): episode_state.append([])
         while episode_condition:
@@ -197,23 +203,27 @@ if __name__=="__main__":
                 s[sensor_index].gen_sensor_reward(MAX_UNCERTAINTY, window_size, window_lag)
 
             #Update estimate of global
-            fusion_agent.update_global(s)
+
+            if n==500: sys.exit(0)
+            fusion_agent.update_global(s,False)
+
             metric_obj.update_truth_estimate_metrics(t, s)
 
-            discount_vector = gamma * np.array(discount_vector)
-            discounted_return += (1.0 * s.reward[-1]) * discount_vector
-            new_return = 1.0 * s.reward[-1]
-            list_discounted_return = list(discounted_return)
-            list_discounted_return.append(new_return)
-            discounted_return = np.array(list_discounted_return)
+            #discount_vector = gamma * np.array(discount_vector)
+            #discounted_return += (1.0 * s.reward[-1]) * discount_vector
+            #new_return = 1.0 * s.reward[-1]
+            #list_discounted_return = list(discounted_return)
+            #list_discounted_return.append(new_return)
+            #discounted_return = np.array(list_discounted_return)
 
-            list_discount_vector = list(discount_vector)
-            list_discount_vector.append(1)
-            discount_vector = np.array(list_discount_vector)
+            #list_discount_vector = list(discount_vector)
+            #list_discount_vector.append(1)
+            #discount_vector = np.array(list_discount_vector)
             n += 1
             if n > episode_length: episode_condition = False
 
-        #MODIFIED TILL HERE
+        sys.exit(1)
+        #MODIFIED by HERE
 
         #TRAINING
         if np.mean(metric_obj.pos_error[0][0]) > 10000:
