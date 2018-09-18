@@ -34,7 +34,7 @@ def gen_learning_rate(iteration, l_max, l_min, N_max):
 # Set general parameters
 MAX_UNCERTAINTY = 1E9
 num_states = 6
-sigma_max = 2
+sigma_max = .001
 num_episodes = []
 gamma = .99
 episode_length = 1500
@@ -65,13 +65,13 @@ if __name__=="__main__":
     #print("Starting Thread:" + str(process_index))
 
     # Random initialization of policy weights
-    pre_trained_weights =  np.array([[7.8298383, 10.37983478, 3.35204969, 9.91446941,
-                        -2.84844313, -13.96745699],
-                      [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
-                        12.16543779, -4.48418833]])
+    #pre_trained_weights =  np.array([[7.8298383, 10.37983478, 3.35204969, 9.91446941,
+     #                   -2.84844313, -13.96745699],
+      #                [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
+       #                 12.16543779, -4.48418833]])
     sensor_params = []
-    #for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
-    for sensor_index in range(0,num_sensors): sensor_params.append(pre_trained_weights)
+    for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
+    #for sensor_index in range(0,num_sensors): sensor_params.append(pre_trained_weights)
 
     #params[0]["weight"] = np.array([[ 1.45702249, -1.17664153, -0.11593174,  1.02967173, -0.25321044,0.09052774],
     #[ 0.67730786,  0.3213561 ,  0.99580938, -2.39007038, -1.16340594,
@@ -129,6 +129,8 @@ if __name__=="__main__":
 
     # weight = np.reshape(np.array(weights[0]), [2, 6])
     sigma = sigma_max
+
+    mean_pos_error = []
     while episode_counter < N_max:
         # sigma = gen_learning_rate(episode_counter,sigma_max,.1,20000)
         # if episode_counter%1500==0 and episode_counter>0:
@@ -205,9 +207,11 @@ if __name__=="__main__":
             #Update estimate of global
 
             if n==500: sys.exit(0)
-            fusion_agent.update_global(s,False)
+            #fusion_agent.update_global(s,False)
+            fusion_agent.update_global_memoryless(s,feedback=True)
 
             metric_obj.update_truth_estimate_metrics(t, s)
+            metric_obj.update_truth_fusion_estimate_metrics(t,fusion_agent)
 
             #discount_vector = gamma * np.array(discount_vector)
             #discounted_return += (1.0 * s.reward[-1]) * discount_vector
@@ -222,7 +226,12 @@ if __name__=="__main__":
             n += 1
             if n > episode_length: episode_condition = False
 
+        mean_pos_error.append(np.mean(metric_obj.pos_error_fusion[0]))
         sys.exit(1)
+        if episode_counter>100: break
+        print(episode_counter)
+        episode_counter+=1
+        continue
         #MODIFIED by HERE
 
         #TRAINING

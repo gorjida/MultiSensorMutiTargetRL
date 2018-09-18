@@ -24,8 +24,14 @@ class centralized_fusion:
                 self.sensors_target_uncertainty[n].append([])
 
 
+    def calculate_senosr_reward(self,diff_uncertainty):
+        if diff_uncertainty<0:
+            return (1)
+        else:
+            return (0)
+
     #For now, let's go with known assignment (this is not realisitic but just for sanity checks)
-    def form_2d_assignment(self,local_x_k_k_s,local_p_k_k_s):
+    def form_2d_assignment(self,local_x_k_k_s,local_p_k_k_s,global_x_k_k_s,global_p_k_k_s):
         local_to_global_map = {}
         for n in range(0,self.num_targets):
             local_to_global_map[n] = n
@@ -89,8 +95,7 @@ class centralized_fusion:
                 else:
                     self.reward[sensor_index].append(0)
 
-    def update_global_memoryless(self,sensors):
-
+    def update_global_memoryless(self,sensors,feedback=False):
         cum_cov = {}
         cum_mean = {}
         for t in range(0, len(self.global_x_k_k)):
@@ -99,30 +104,60 @@ class centralized_fusion:
             cum_cov[t] = []
             cum_mean[t] = []
 
+        sensor_to_track_assignment = {}
+        target_uncertainty = {}
         for sensor_index in range(0, self.num_sensors):
+            sensor_to_track_assignment[sensor_index] = {}
             current_sensor_object = sensors[sensor_index]
-            local_tracks = current_sensor_object.tracker_object.tracks
-            local_x_k_k_s = []
-            local_p_k_k_s = []
+            local_tracks = current_sensor_object.tracker_object.tracks #Set of all the tracks
+            local_x_k_k_s = [] #set of local means
+            local_p_k_k_s = [] #set of local covariance matrices
             for track in local_tracks:
                 local_x_k_k_s.append(track.x_k_k)
                 local_p_k_k_s.append(track.p_k_k)
-            local_to_global_map = self.form_2d_assignment(local_x_k_k_s, local_p_k_k_s)
+            local_to_global_map = self.form_2d_assignment(local_x_k_k_s, local_p_k_k_s,cum_mean,cum_cov)
+            #TEmporary: each observer has N same tracks and each track is assigned to its own one
+            sensor_to_track_assignment[sensor_index] = local_to_global_map
+
+            temp_target_uncertainty = []
             for target_index in range(0, self.num_targets):
-                local_x_k_k = local_x_k_k_s[target_index]
-                local_p_k_k = local_p_k_k_s[target_index]
+                if target_index in sensor_to_track_assignment[sensor_index]:
+                    assigned_target_index = sensor_to_track_assignment[sensor_index][target_index]
+                    local_x_k_k = local_x_k_k_s[assigned_target_index]
+                    local_p_k_k = local_p_k_k_s[assigned_target_index]
 
+                    if not cum_cov[target_index]:
+                        cum_cov[target_index].append(np.linalg.inv(local_p_k_k))
+                        cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k))
+                    else:
+                        cum_cov[target_index].append(np.linalg.inv(local_p_k_k)+cum_cov[target_index][-1])
+                        cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k)+cum_mean[target_index][-1])
+                        temp_target_uncertainty.append((np.trace(np.linalg.inv(cum_cov[target_index][-1]))-
+                                                        np.trace(np.linalg.inv(cum_cov[target_index][-2]))) )
 
-                if not cum_cov[target_index]:
-                    cum_cov[target_index].append(np.linalg.inv(local_p_k_k))
-                    cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k))
+            target_uncertainty[sensor_index] = temp_target_uncertainty
+
+        #print(target_uncertainty)
+        for sensor_index in range(0, self.num_sensors):
+            if not not target_uncertainty[sensor_index]:
+                rewards = []
+                for u in target_uncertainty[sensor_index]: rewards.append(self.calculate_senosr_reward(u))
+                #Use max-vote
+                if sum(rewards)/(1.0*len(rewards))>.5:
+                    self.reward[sensor_index].append(1)
                 else:
-                    cum_cov[target_index].append(np.linalg.inv(local_p_k_k)+cum_cov[target_index][-1])
-                    cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k)+cum_mean[target_index][-1])
+                    self.reward[sensor_index].append(-1)
 
         for t in range(0, len(self.global_x_k_k)):
             self.global_p_k_k[t] = np.linalg.inv(cum_cov[t][-1])
             self.global_x_k_k[t] = self.global_p_k_k[t].dot(cum_mean[t][-1])
+            if feedback:
+                for sensor_index in range(0,self.num_sensors):
+                    current_sensor_object = sensors[sensor_index]
+                    if t in sensor_to_track_assignment[sensor_index]:
+                        assigned_target_index = sensor_to_track_assignment[t]
+                        sensors[sensor_index].tracker_object.tracks[t].x_k_k = self.global_x_k_k[t]
+                        #sensors[sensor_index].tracker_object.tracks[t].p_k_k = self.global_p_k_k[t]
 
 
 
