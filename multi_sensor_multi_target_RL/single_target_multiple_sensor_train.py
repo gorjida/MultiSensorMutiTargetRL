@@ -16,6 +16,7 @@ from scipy.stats import norm
 from sensor import get_limit
 import matplotlib.pyplot as plt
 from FUSION_Agent import centralized_fusion
+random.seed(1)
 
 #import sklearn.pipeline
 #from sklearn.kernel_approximation import RBFSampler
@@ -48,7 +49,7 @@ base_path = "/dev/resoures/DeepSensorManagement-original/"
 
 #def run(args):
 if __name__=="__main__":
-    num_sensors = 3
+    num_sensors = 2
     v_max = 20
     coeff = .9
     vel_var = .001
@@ -65,13 +66,13 @@ if __name__=="__main__":
     #print("Starting Thread:" + str(process_index))
 
     # Random initialization of policy weights
-    #pre_trained_weights =  np.array([[7.8298383, 10.37983478, 3.35204969, 9.91446941,
-     #                   -2.84844313, -13.96745699],
-      #                [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
-       #                 12.16543779, -4.48418833]])
+    pre_trained_weights =  np.array([[7.8298383, 10.37983478, 3.35204969, 9.91446941,
+                        -2.84844313, -13.96745699],
+                      [-14.93342663, 9.27361261, -4.04988106, 0.17954491,
+                        12.16543779, -4.48418833]])
     sensor_params = []
-    for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
-    #for sensor_index in range(0,num_sensors): sensor_params.append(pre_trained_weights)
+    #for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
+    for sensor_index in range(0,num_sensors): sensor_params.append(pre_trained_weights)
 
     #params[0]["weight"] = np.array([[ 1.45702249, -1.17664153, -0.11593174,  1.02967173, -0.25321044,0.09052774],
     #[ 0.67730786,  0.3213561 ,  0.99580938, -2.39007038, -1.16340594,
@@ -144,7 +145,7 @@ if __name__=="__main__":
         discount_vector = np.array([])
         # print(episodes_counter)
         scen = scenario(1, 1)
-        bearing_var = 1E-2  # variance of bearing measurement
+        bearing_var = 1E-1  # variance of bearing measurement
         # Randomly initialize target location
         x = 20000 * random.random() -10000  # initial x-location
         y = 20000 * random.random() -10000  # initial y-location
@@ -164,8 +165,12 @@ if __name__=="__main__":
         MAX_UNCERTAINTY_FUSION = 1E12
         init_target_cov_for_fusion.append(np.diag([MAX_UNCERTAINTY_FUSION, MAX_UNCERTAINTY_FUSION, MAX_UNCERTAINTY_FUSION,
                                    MAX_UNCERTAINTY_FUSION]))
+
+        ###
+        temp_sensor_state = [[-5000,5000,0,0],[5000,-5000,0,0],[-5000,-5000,0,0]]
         for sensor_index in range(0,num_sensors):
             init_sensor_state = [10000 * random.random() - 5000, 10000 * random.random() - 5000, 3, -2]
+            init_sensor_state = temp_sensor_state[sensor_index]
             temp_sensor_object = sensor("POLICY_COMM_LINEAR",init_sensor_state[0]
                                         , init_sensor_state[1])
 
@@ -206,7 +211,7 @@ if __name__=="__main__":
 
             #Update estimate of global
 
-            if n==500: sys.exit(0)
+            #if n==500: sys.exit(0)
             #fusion_agent.update_global(s,False)
             fusion_agent.update_global_memoryless(s,feedback=True)
 
@@ -226,8 +231,9 @@ if __name__=="__main__":
             n += 1
             if n > episode_length: episode_condition = False
 
+        #sys.exit(0)
+        if np.mean(metric_obj.pos_error_fusion[0])>1000: continue
         mean_pos_error.append(np.mean(metric_obj.pos_error_fusion[0]))
-        sys.exit(1)
         if episode_counter>100: break
         print(episode_counter)
         episode_counter+=1

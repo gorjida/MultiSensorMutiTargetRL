@@ -132,21 +132,38 @@ class centralized_fusion:
                     else:
                         cum_cov[target_index].append(np.linalg.inv(local_p_k_k)+cum_cov[target_index][-1])
                         cum_mean[target_index].append(np.linalg.inv(local_p_k_k).dot(local_x_k_k)+cum_mean[target_index][-1])
-                        temp_target_uncertainty.append((np.trace(np.linalg.inv(cum_cov[target_index][-1]))-
-                                                        np.trace(np.linalg.inv(cum_cov[target_index][-2]))) )
+                        #temp_target_uncertainty.append((np.trace(np.linalg.inv(cum_cov[target_index][-1]))-
+                         #                               np.trace(np.linalg.inv(cum_cov[target_index][-2]))))
 
-            target_uncertainty[sensor_index] = temp_target_uncertainty
+                    temp_target_uncertainty.append(np.trace(np.linalg.inv(cum_cov[target_index][-1]))/self.MAX_UNCERTAINTY)
+                    #Store uncertainy
+                    #self.sensors_target_uncertainty[sensor_index][target_index].append(np.trace(np.linalg.inv(cum_cov[target_index][-1])))
 
-        #print(target_uncertainty)
-        for sensor_index in range(0, self.num_sensors):
-            if not not target_uncertainty[sensor_index]:
-                rewards = []
-                for u in target_uncertainty[sensor_index]: rewards.append(self.calculate_senosr_reward(u))
-                #Use max-vote
-                if sum(rewards)/(1.0*len(rewards))>.5:
+            self.sensors_avg_uncertainty[sensor_index].append(np.mean(temp_target_uncertainty))
+            #calculate reward
+            if len(self.sensors_avg_uncertainty[sensor_index]) < self.window_size + self.window_lag:
+                self.reward[sensor_index].append(0)
+            else:
+                current_avg = np.mean(self.sensors_avg_uncertainty[sensor_index][-self.window_size:])
+                prev_avg = np.mean(self.sensors_avg_uncertainty[sensor_index][-(self.window_size
+                                                                                + self.window_lag):-self.window_lag])
+                if current_avg < prev_avg:# or self.sensors_avg_uncertainty[sensor_index][-1] < .1:
+                    # if current_avg < prev_avg:
                     self.reward[sensor_index].append(1)
                 else:
-                    self.reward[sensor_index].append(-1)
+                    self.reward[sensor_index].append(0)
+            #target_uncertainty[sensor_index] = temp_target_uncertainty
+
+        #print(target_uncertainty)
+        #for sensor_index in range(0, self.num_sensors):
+         #   if not not target_uncertainty[sensor_index]:
+          #      rewards = []
+           #     for u in target_uncertainty[sensor_index]: rewards.append(self.calculate_senosr_reward(u))
+                #Use max-vote
+            #    if sum(rewards)/(1.0*len(rewards))>.5:
+             #       self.reward[sensor_index].append(1)
+              #  else:
+               #     self.reward[sensor_index].append(-1)
 
         for t in range(0, len(self.global_x_k_k)):
             self.global_p_k_k[t] = np.linalg.inv(cum_cov[t][-1])
