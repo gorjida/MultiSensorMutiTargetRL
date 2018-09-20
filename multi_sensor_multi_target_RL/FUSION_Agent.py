@@ -147,7 +147,7 @@ class centralized_fusion:
                 current_avg = np.mean(self.sensors_avg_uncertainty[sensor_index][-self.window_size:])
                 prev_avg = np.mean(self.sensors_avg_uncertainty[sensor_index][-(self.window_size
                                                                                 + self.window_lag):-self.window_lag])
-                if current_avg < prev_avg:# or self.sensors_avg_uncertainty[sensor_index][-1] < .1:
+                if current_avg < prev_avg or self.sensors_avg_uncertainty[sensor_index][-1] < 1E-4:
                     # if current_avg < prev_avg:
                     self.reward[sensor_index].append(1)
                 else:

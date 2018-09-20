@@ -16,7 +16,7 @@ from scipy.stats import norm
 from sensor import get_limit
 import matplotlib.pyplot as plt
 from FUSION_Agent import centralized_fusion
-random.seed(1)
+#random.seed(3)
 
 #import sklearn.pipeline
 #from sklearn.kernel_approximation import RBFSampler
@@ -38,7 +38,7 @@ num_states = 6
 sigma_max = .001
 num_episodes = []
 gamma = .99
-episode_length = 1500
+episode_length = 1000
 learning_rate = 1E-3
 N_max = 10000
 window_size = 50
@@ -50,7 +50,7 @@ base_path = "/dev/resoures/DeepSensorManagement-original/"
 #def run(args):
 if __name__=="__main__":
     num_sensors = 2
-    v_max = 20
+    v_max = 15
     coeff = .9
     vel_var = .001
 
@@ -132,6 +132,7 @@ if __name__=="__main__":
     sigma = sigma_max
 
     mean_pos_error = []
+    rewards = []
     while episode_counter < N_max:
         # sigma = gen_learning_rate(episode_counter,sigma_max,.1,20000)
         # if episode_counter%1500==0 and episode_counter>0:
@@ -141,8 +142,12 @@ if __name__=="__main__":
             sigma = sigma_max
             sigma = max(.1, sigma)
         sigma = sigma_max
-        discounted_return = np.array([])
-        discount_vector = np.array([])
+
+        discounted_return = []
+        discount_vector = []
+        for n in range(0,num_sensors):
+            discounted_return.append(np.array([]))
+            discount_vector.append(np.array([]))
         # print(episodes_counter)
         scen = scenario(1, 1)
         bearing_var = 1E-1  # variance of bearing measurement
@@ -197,6 +202,8 @@ if __name__=="__main__":
         for sensor_index in range(0,num_sensors): episode_state.append([])
         while episode_condition:
             t[0].update_location()
+            if t[0].current_location[0]>scen.x_max or t[0].current_location[0]<scen.x_min or t[0].current_location[1]>scen.y_max or t[0].current_location[1]<scen.y_min: break
+
             #m.append(measure.generate_bearing(t.current_location, s.current_location))
             for sensor_index in range(0,num_sensors):
                 s[sensor_index].gen_measurements(t, measurement(bearing_var), 1, 0)
@@ -218,24 +225,31 @@ if __name__=="__main__":
             metric_obj.update_truth_estimate_metrics(t, s)
             metric_obj.update_truth_fusion_estimate_metrics(t,fusion_agent)
 
-            #discount_vector = gamma * np.array(discount_vector)
-            #discounted_return += (1.0 * s.reward[-1]) * discount_vector
-            #new_return = 1.0 * s.reward[-1]
-            #list_discounted_return = list(discounted_return)
-            #list_discounted_return.append(new_return)
-            #discounted_return = np.array(list_discounted_return)
+            for sensor_index in range(0,num_sensors):
+                discount_vector[sensor_index] = gamma * np.array(discount_vector[sensor_index])
+                discounted_return[sensor_index] += (1.0 * fusion_agent.reward[sensor_index][-1]) * discount_vector[sensor_index]
+                new_return = 1.0 * fusion_agent.reward[sensor_index][-1]
+                list_discounted_return = list(discounted_return[sensor_index])
+                list_discounted_return.append(new_return)
+                discounted_return[sensor_index] = np.array(list_discounted_return)
 
-            #list_discount_vector = list(discount_vector)
-            #list_discount_vector.append(1)
-            #discount_vector = np.array(list_discount_vector)
+                list_discount_vector = list(discount_vector[sensor_index])
+                list_discount_vector.append(1)
+                discount_vector[sensor_index] = np.array(list_discount_vector)
+
             n += 1
             if n > episode_length: episode_condition = False
 
-        #sys.exit(0)
+        sys.exit(0)
         if np.mean(metric_obj.pos_error_fusion[0])>1000: continue
+        rewards.append(np.mean([sum(fusion_agent.reward[0]),sum(fusion_agent.reward[1])]))
         mean_pos_error.append(np.mean(metric_obj.pos_error_fusion[0]))
-        if episode_counter>100: break
+        if episode_counter>100:
+            sys.exit(0)
+        ####
+        #s = sorted(mean_pos_error)
         print(episode_counter)
+        #if np.mean(metric_obj.pos_error_fusion[0]) >50: sys.exit(0)
         episode_counter+=1
         continue
         #MODIFIED by HERE

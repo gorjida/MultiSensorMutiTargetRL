@@ -24,7 +24,7 @@ class target(motion_model):
     def update_location(self):
 
         if self.motion_type==self.constant_velocity_type:
-            A,B = self.constant_velocity(2E-4)
+            A,B = self.constant_velocity(1E-4)
 
         #sigma_x = ((self.x_var)*abs(self.initial_velocity[0]))/20.0
         #sigma_y = ((self.y_var) * abs(self.initial_velocity[1])) / 20.0
