@@ -35,10 +35,10 @@ def gen_learning_rate(iteration, l_max, l_min, N_max):
 # Set general parameters
 MAX_UNCERTAINTY = 1E9
 num_states = 6
-sigma_max = .001
+sigma_max = 2
 num_episodes = []
 gamma = .99
-episode_length = 1000
+episode_length = 1500
 learning_rate = 1E-3
 N_max = 10000
 window_size = 50
@@ -72,7 +72,7 @@ if __name__=="__main__":
                         12.16543779, -4.48418833]])
     sensor_params = []
     #for sensor_index in range(0,num_sensors):sensor_params.append(np.random.normal(0, .3, [2, num_states]))
-    for sensor_index in range(0,num_sensors): sensor_params.append(pre_trained_weights)
+    for sensor_index in range(0,num_sensors): sensor_params.append(np.array(pre_trained_weights))
 
     #params[0]["weight"] = np.array([[ 1.45702249, -1.17664153, -0.11593174,  1.02967173, -0.25321044,0.09052774],
     #[ 0.67730786,  0.3213561 ,  0.99580938, -2.39007038, -1.16340594,
@@ -217,9 +217,6 @@ if __name__=="__main__":
                 s[sensor_index].gen_sensor_reward(MAX_UNCERTAINTY, window_size, window_lag)
 
             #Update estimate of global
-
-            #if n==500: sys.exit(0)
-            #fusion_agent.update_global(s,False)
             fusion_agent.update_global_memoryless(s,feedback=True)
 
             metric_obj.update_truth_estimate_metrics(t, s)
@@ -239,6 +236,45 @@ if __name__=="__main__":
 
             n += 1
             if n > episode_length: episode_condition = False
+        #if episode_counter==2: sys.exit(0)
+        if np.mean(metric_obj.pos_error_fusion[0]) > 1000: continue
+        #Training and parameter tuning
+        for sensor_index in range(0,num_sensors):
+            normalized_discounted_return = discounted_return[sensor_index]
+            episode_actions = s[sensor_index].sensor_actions
+            rate = gen_learning_rate(episode_counter, learning_rate, 1E-8, 10000)
+            # total_adjustment = np.zeros(np.shape(weight))
+            for e in range(0, len(episode_actions)):
+                # calculate gradiant
+                state = np.array(episode_state[sensor_index][e]).reshape(len(episode_state[sensor_index][e]), 1)
+                predicted_action = sensor_params[sensor_index].dot(state)
+                limitted_action1, grad1 = get_limit(v_max, coeff, alpha1, alpha2, alpha1_, alpha2_,
+                                                    predicted_action[0][0])
+                limitted_action2, grad2 = get_limit(v_max, coeff, alpha1, alpha2, alpha1_, alpha2_,
+                                                    predicted_action[1][0])
+                predicted_action[0][0] = limitted_action1
+                predicted_action[1][0] = limitted_action2
+                limit_grad = np.array([grad1, grad2]).reshape([2, 1])
+                gradiant = ((episode_actions[e].reshape(2, 1) - predicted_action) * limit_grad).dot(
+                    state.transpose()) / sigma ** 2
+
+                if np.max(np.abs(gradiant)) > 1E2: continue  # clip large gradients
+                adjustment_term = gradiant * normalized_discounted_return[e]  # an unbiased sample of return
+                sensor_params[sensor_index] += rate * adjustment_term
+
+        return_saver.append(np.mean([sum(fusion_agent.reward[0]),sum(fusion_agent.reward[1])]))
+        if episode_counter % 100 == 0 and episode_counter > 0:
+            #print(episode_counter, np.mean(return_saver), sigma)
+            # if episode_counter%100==0 and episode_counter>0:
+            avg_reward.append(np.mean(sorted(return_saver)[0:int(.95 * len(return_saver))]))
+            #avg_error.append(np.mean(sorted(error_saver)[0:int(.95 * len(error_saver))]))
+            #var_reward.append(np.var(return_saver))
+            return_saver = []
+            error_saver = []
+            print(avg_reward)
+
+        episode_counter+=1
+        continue
 
         sys.exit(0)
         if np.mean(metric_obj.pos_error_fusion[0])>1000: continue
